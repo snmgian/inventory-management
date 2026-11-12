@@ -2,10 +2,28 @@
 Tests for the restocking feature: forecast pricing data, recommendation
 algorithm, and restock order endpoints.
 """
+from datetime import datetime
+
 import pytest
 
+import main
 from mock_data import demand_forecasts
-from restocking import rank_forecasts, recommend_restock
+from restocking import (
+    RestockValidationError,
+    build_restock_order,
+    rank_forecasts,
+    recommend_restock,
+)
+
+FIXED_NOW = datetime(2026, 11, 12, 14, 3, 27, 123456)
+
+
+@pytest.fixture(autouse=True)
+def clear_restock_orders():
+    """The order store is module-level state; isolate every test."""
+    main.restock_orders.clear()
+    yield
+    main.restock_orders.clear()
 
 # Expected (unit_cost, lead_time_days) per SKU. Source: spec section 1.
 EXPECTED_PRICING = {
@@ -164,4 +182,117 @@ class TestRecommendationsEndpoint:
     def test_non_finite_or_oversized_budget_is_422(self, client, budget):
         # Without the upper bound these reach the cents conversion and 500.
         response = client.get(f"/api/restock/recommendations?budget={budget}")
+        assert response.status_code == 422
+
+
+class TestBuildRestockOrder:
+
+    def test_prices_lines_from_server_data(self):
+        order = build_restock_order(
+            demand_forecasts, 30000,
+            [{"sku": "WDG-001", "quantity": 450}, {"sku": "BRG-102", "quantity": 36}],
+            order_id=1, now=FIXED_NOW,
+        )
+        assert order["id"] == "1"
+        assert order["order_number"] == "RST-0001"
+        assert order["status"] == "Submitted"
+        assert order["budget"] == 30000.0
+        assert order["total_cost"] == 14467.5          # 11245.50 + 3222.00
+        assert order["lead_time_days"] == 14           # max(7, 14)
+        assert order["submitted_at"] == "2026-11-12T14:03:27"
+        assert order["expected_delivery"] == "2026-11-26T14:03:27"
+        assert order["items"] == [
+            {"sku": "WDG-001", "name": "Industrial Widget Type A", "quantity": 450,
+             "unit_cost": 24.99, "line_total": 11245.5, "lead_time_days": 7},
+            {"sku": "BRG-102", "name": "Steel Bearing Assembly", "quantity": 36,
+             "unit_cost": 89.5, "line_total": 3222.0, "lead_time_days": 14},
+        ]
+
+    def test_order_number_is_zero_padded(self):
+        order = build_restock_order(
+            demand_forecasts, 100, [{"sku": "FLT-405", "quantity": 1}],
+            order_id=12, now=FIXED_NOW,
+        )
+        assert order["order_number"] == "RST-0012"
+
+    @pytest.mark.parametrize("budget, items, message", [
+        (1000, [], "at least one item"),
+        (1000, [{"sku": "NOPE-1", "quantity": 1}], "Unknown SKU: NOPE-1"),
+        (1000, [{"sku": "FLT-405", "quantity": 1}, {"sku": "FLT-405", "quantity": 1}],
+         "Duplicate SKU: FLT-405"),
+        (1000, [{"sku": "FLT-405", "quantity": 0}], "between 1 and 950"),
+        (100000, [{"sku": "FLT-405", "quantity": 951}], "between 1 and 950"),
+        (100, [{"sku": "MTR-304", "quantity": 1}], "exceeds budget"),
+    ])
+    def test_validation_errors(self, budget, items, message):
+        with pytest.raises(RestockValidationError, match=message):
+            build_restock_order(demand_forecasts, budget, items, order_id=1, now=FIXED_NOW)
+
+
+class TestRestockOrderEndpoints:
+
+    def test_list_is_empty_initially(self, client):
+        response = client.get("/api/restock-orders")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_create_returns_201_with_server_pricing(self, client):
+        response = client.post("/api/restock-orders", json={
+            "budget": 30000,
+            "items": [{"sku": "WDG-001", "quantity": 450}, {"sku": "BRG-102", "quantity": 36}],
+        })
+        assert response.status_code == 201
+        order = response.json()
+        assert order["order_number"] == "RST-0001"
+        assert order["status"] == "Submitted"
+        assert order["total_cost"] == 14467.5
+        assert order["lead_time_days"] == 14
+        submitted = datetime.fromisoformat(order["submitted_at"])
+        expected = datetime.fromisoformat(order["expected_delivery"])
+        assert (expected - submitted).days == 14
+        assert submitted.microsecond == 0
+
+    def test_recommendation_round_trip_is_accepted(self, client):
+        """Submitting exactly what the recommendations endpoint returned succeeds."""
+        rec = client.get("/api/restock/recommendations?budget=30000").json()
+        response = client.post("/api/restock-orders", json={
+            "budget": rec["budget"],
+            "items": [{"sku": i["sku"], "quantity": i["quantity"]} for i in rec["items"]],
+        })
+        assert response.status_code == 201
+        assert response.json()["total_cost"] == rec["total_cost"]
+
+    def test_list_is_newest_first_with_sequential_numbers(self, client):
+        for _ in range(2):
+            client.post("/api/restock-orders", json={
+                "budget": 100, "items": [{"sku": "FLT-405", "quantity": 1}],
+            })
+        numbers = [o["order_number"] for o in client.get("/api/restock-orders").json()]
+        assert numbers == ["RST-0002", "RST-0001"]
+
+    @pytest.mark.parametrize("payload", [
+        {"budget": 1000, "items": []},
+        {"budget": 1000, "items": [{"sku": "NOPE-1", "quantity": 1}]},
+        {"budget": 1000, "items": [{"sku": "FLT-405", "quantity": 1},
+                                   {"sku": "FLT-405", "quantity": 1}]},
+        {"budget": 1000, "items": [{"sku": "FLT-405", "quantity": 0}]},
+        {"budget": 100, "items": [{"sku": "MTR-304", "quantity": 1}]},
+    ])
+    def test_invalid_orders_are_400_and_not_stored(self, client, payload):
+        response = client.post("/api/restock-orders", json=payload)
+        assert response.status_code == 400
+        assert isinstance(response.json()["detail"], str)
+        assert client.get("/api/restock-orders").json() == []
+
+    def test_negative_budget_is_422(self, client):
+        response = client.post("/api/restock-orders", json={
+            "budget": -1, "items": [{"sku": "FLT-405", "quantity": 1}],
+        })
+        assert response.status_code == 422
+
+    def test_oversized_budget_is_422(self, client):
+        # Same cap as the recommendations endpoint: keeps huge values out of the cents conversion.
+        response = client.post("/api/restock-orders", json={
+            "budget": 1e12, "items": [{"sku": "FLT-405", "quantity": 1}],
+        })
         assert response.status_code == 422
