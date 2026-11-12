@@ -6,6 +6,7 @@ export default {
     orders: '注文',
     finance: '財務',
     demandForecast: '需要予測',
+    restocking: '補充',
     companyName: '触媒コンポーネンツ',
     subtitle: '在庫管理システム'
   },
@@ -106,6 +107,7 @@ export default {
     title: '注文',
     description: '顧客注文の表示と管理',
     allOrders: 'すべての注文',
+    submittedOrders: '提出済み注文',
     totalOrders: '総注文数',
     totalRevenue: '総収益',
     avgOrderValue: '平均注文額',
@@ -125,7 +127,39 @@ export default {
       totalValue: '合計金額',
       status: 'ステータス',
       expectedDelivery: '予定配達日',
+      submittedAt: '提出日',
+      totalCost: '合計金額',
+      leadTime: 'リードタイム',
       actualDelivery: '実際の配達日'
+    }
+  },
+
+  // Restocking
+  restocking: {
+    title: '在庫補充',
+    description: '予算を設定して需要予測に基づく補充推奨を表示します',
+    budget: '利用可能な予算',
+    recommendedItems: '推奨品目',
+    noItems: 'この予算内に収まる品目はありません。予算を増やすと推奨が表示されます。',
+    totalCost: '合計金額',
+    remainingBudget: '残り予算',
+    leadTime: '注文リードタイム',
+    itemCount: '品目数',
+    days: '{count}日',
+    partial: '一部',
+    placeOrder: '注文する',
+    placingOrder: '注文中...',
+    orderPlaced: '注文 {orderNumber} を受け付けました。',
+    viewInOrders: '注文で確認',
+    loadError: '推奨の読み込みに失敗しました',
+    table: {
+      sku: 'SKU',
+      item: '品目',
+      trend: '傾向',
+      quantity: '数量',
+      unitCost: '単価',
+      lineTotal: '小計',
+      leadTime: 'リードタイム'
     }
   },
 
@@ -204,6 +238,7 @@ export default {
     shipped: '出荷済み',
     processing: '処理中',
     backordered: 'バックオーダー',
+    submitted: '提出済み',
     inStock: '在庫あり',
     lowStock: '在庫僅少',
     adequate: '適量'

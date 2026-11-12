@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from restocking import recommend_restock, build_restock_order, RestockValidationError
 
 app = FastAPI(title="Factory Inventory Management System")
 
@@ -13,6 +15,10 @@ QUARTER_MAP = {
     'Q3-2025': ['2025-07', '2025-08', '2025-09'],
     'Q4-2025': ['2025-10', '2025-11', '2025-12']
 }
+
+# Submitted restock orders, newest last. In-memory only by design: like all
+# other data in this demo they reset when the server restarts.
+restock_orders: List[dict] = []
 
 def filter_by_month(items: list, month: Optional[str]) -> list:
     """Filter items by month/quarter based on order_date field"""
@@ -89,6 +95,8 @@ class DemandForecast(BaseModel):
     forecasted_demand: int
     trend: str
     period: str
+    unit_cost: float
+    lead_time_days: int
 
 class BacklogItem(BaseModel):
     id: str
@@ -119,6 +127,53 @@ class CreatePurchaseOrderRequest(BaseModel):
     unit_cost: float
     expected_delivery_date: str
     notes: Optional[str] = None
+
+class RestockRecommendationItem(BaseModel):
+    sku: str
+    name: str
+    trend: str
+    quantity: int
+    forecasted_demand: int
+    unit_cost: float
+    line_total: float
+    lead_time_days: int
+    partial: bool
+
+class RestockRecommendation(BaseModel):
+    budget: float
+    max_budget: float
+    total_cost: float
+    remaining_budget: float
+    lead_time_days: int
+    items: List[RestockRecommendationItem]
+
+class RestockOrderItemRequest(BaseModel):
+    sku: str
+    quantity: int
+
+class CreateRestockOrderRequest(BaseModel):
+    # The cap keeps oversized values out of the integer-cents conversion (same cap as the recommendations GET).
+    budget: float = Field(ge=0, le=1_000_000_000)
+    items: List[RestockOrderItemRequest]
+
+class RestockOrderLine(BaseModel):
+    sku: str
+    name: str
+    quantity: int
+    unit_cost: float
+    line_total: float
+    lead_time_days: int
+
+class RestockOrder(BaseModel):
+    id: str
+    order_number: str
+    submitted_at: str
+    status: str
+    budget: float
+    total_cost: float
+    lead_time_days: int
+    expected_delivery: str
+    items: List[RestockOrderLine]
 
 # API endpoints
 @app.get("/")
@@ -303,6 +358,33 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+@app.get("/api/restock/recommendations", response_model=RestockRecommendation)
+# The upper bound keeps inf, nan and huge values out of the integer-cents conversion; without it they cause a 500.
+def get_restock_recommendations(budget: float = Query(..., ge=0, le=1_000_000_000)):
+    """Recommend forecast items to restock within the given budget (USD)."""
+    return recommend_restock(demand_forecasts, budget)
+
+@app.post("/api/restock-orders", response_model=RestockOrder, status_code=201)
+def create_restock_order(request: CreateRestockOrderRequest):
+    """Submit a restock order. Lines are re-priced and validated server-side."""
+    try:
+        order = build_restock_order(
+            demand_forecasts,
+            request.budget,
+            [item.model_dump() for item in request.items],
+            order_id=len(restock_orders) + 1,
+            now=datetime.now(),
+        )
+    except RestockValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    restock_orders.append(order)
+    return order
+
+@app.get("/api/restock-orders", response_model=List[RestockOrder])
+def get_restock_orders():
+    """List submitted restock orders, newest first."""
+    return list(reversed(restock_orders))
 
 if __name__ == "__main__":
     import uvicorn

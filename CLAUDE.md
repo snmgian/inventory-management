@@ -54,6 +54,12 @@ npm install && npm run dev
 - `GET /api/dashboard/summary` - All filters
 - `GET /api/demand`, `/api/backlog` - No filters
 - `GET /api/spending/*` - Summary, monthly, categories, transactions
+- `GET /api/restock/recommendations?budget=` - Budget-based restock picks from demand forecasts (budget 0 to 1e9)
+- `POST /api/restock-orders` - Submit a restock order; server re-prices lines, 400 on invalid
+- `GET /api/restock-orders` - Submitted restock orders, newest first (in-memory, reset on restart)
+
+## Code Conventions
+- Always document non-obvious logic changes with comments
 
 ## Common Issues
 1. Use unique keys in v-for (not `index`) - use `sku`, `month`, etc.
