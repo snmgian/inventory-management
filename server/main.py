@@ -327,7 +327,8 @@ def get_monthly_trends():
     return result
 
 @app.get("/api/restock/recommendations", response_model=RestockRecommendation)
-def get_restock_recommendations(budget: float = Query(..., ge=0)):
+# The upper bound keeps inf, nan and huge values out of the integer-cents conversion; without it they cause a 500.
+def get_restock_recommendations(budget: float = Query(..., ge=0, le=1_000_000_000)):
     """Recommend forecast items to restock within the given budget (USD)."""
     return recommend_restock(demand_forecasts, budget)
 

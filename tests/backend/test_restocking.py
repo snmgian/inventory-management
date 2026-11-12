@@ -159,3 +159,9 @@ class TestRecommendationsEndpoint:
 
     def test_negative_budget_is_422(self, client):
         assert client.get("/api/restock/recommendations?budget=-1").status_code == 422
+
+    @pytest.mark.parametrize("budget", ["inf", "nan", "1e308"])
+    def test_non_finite_or_oversized_budget_is_422(self, client, budget):
+        # Without the upper bound these reach the cents conversion and 500.
+        response = client.get(f"/api/restock/recommendations?budget={budget}")
+        assert response.status_code == 422
