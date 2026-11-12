@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from pydantic import BaseModel
 from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from restocking import recommend_restock
 
 app = FastAPI(title="Factory Inventory Management System")
 
@@ -121,6 +122,25 @@ class CreatePurchaseOrderRequest(BaseModel):
     unit_cost: float
     expected_delivery_date: str
     notes: Optional[str] = None
+
+class RestockRecommendationItem(BaseModel):
+    sku: str
+    name: str
+    trend: str
+    quantity: int
+    forecasted_demand: int
+    unit_cost: float
+    line_total: float
+    lead_time_days: int
+    partial: bool
+
+class RestockRecommendation(BaseModel):
+    budget: float
+    max_budget: float
+    total_cost: float
+    remaining_budget: float
+    lead_time_days: int
+    items: List[RestockRecommendationItem]
 
 # API endpoints
 @app.get("/")
@@ -305,6 +325,11 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+@app.get("/api/restock/recommendations", response_model=RestockRecommendation)
+def get_restock_recommendations(budget: float = Query(..., ge=0)):
+    """Recommend forecast items to restock within the given budget (USD)."""
+    return recommend_restock(demand_forecasts, budget)
 
 if __name__ == "__main__":
     import uvicorn
