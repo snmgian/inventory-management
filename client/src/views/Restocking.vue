@@ -32,11 +32,11 @@
       <div class="stats-grid">
         <div class="stat-card info">
           <div class="stat-label">{{ t('restocking.totalCost') }}</div>
-          <div class="stat-value">{{ formatMoney(recommendation?.total_cost ?? 0) }}</div>
+          <div class="stat-value">{{ formatMoneyExact(recommendation?.total_cost ?? 0) }}</div>
         </div>
         <div class="stat-card success">
           <div class="stat-label">{{ t('restocking.remainingBudget') }}</div>
-          <div class="stat-value">{{ formatMoney(recommendation?.remaining_budget ?? 0) }}</div>
+          <div class="stat-value">{{ formatMoneyExact(recommendation?.remaining_budget ?? 0) }}</div>
         </div>
         <div class="stat-card warning">
           <div class="stat-label">{{ t('restocking.leadTime') }}</div>
@@ -79,8 +79,8 @@
                     <span class="badge warning">{{ t('restocking.partial') }}</span>
                   </template>
                 </td>
-                <td class="num">{{ formatUnitCost(item.unit_cost) }}</td>
-                <td class="num"><strong>{{ formatMoney(item.line_total) }}</strong></td>
+                <td class="num">{{ formatMoneyExact(item.unit_cost) }}</td>
+                <td class="num"><strong>{{ formatMoneyExact(item.line_total) }}</strong></td>
                 <td class="num">{{ t('restocking.days', { count: item.lead_time_days }) }}</td>
               </tr>
             </tbody>
@@ -138,7 +138,8 @@ export default {
     const canPlaceOrder = computed(() => items.value.length > 0 && !submitting.value)
 
     const formatMoney = (amount) => formatCurrency(amount, currentCurrency.value)
-    const formatUnitCost = (amount) => formatCurrencyWithDecimals(amount, currentCurrency.value, 2)
+    // Shows cents so that line totals add up to the displayed total.
+    const formatMoneyExact = (amount) => formatCurrencyWithDecimals(amount, currentCurrency.value, 2)
 
     const fetchRecommendations = async (value) => {
       const seq = ++requestSeq
@@ -216,7 +217,7 @@ export default {
       lastOrder,
       canPlaceOrder,
       formatMoney,
-      formatUnitCost,
+      formatMoneyExact,
       translateProductName,
       placeOrder
     }
