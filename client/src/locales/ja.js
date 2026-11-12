@@ -107,6 +107,7 @@ export default {
     title: '注文',
     description: '顧客注文の表示と管理',
     allOrders: 'すべての注文',
+    submittedOrders: '提出済み注文',
     totalOrders: '総注文数',
     totalRevenue: '総収益',
     avgOrderValue: '平均注文額',
@@ -126,6 +127,9 @@ export default {
       totalValue: '合計金額',
       status: 'ステータス',
       expectedDelivery: '予定配達日',
+      submittedAt: '提出日',
+      totalCost: '合計金額',
+      leadTime: 'リードタイム',
       actualDelivery: '実際の配達日'
     }
   },

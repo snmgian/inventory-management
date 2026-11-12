@@ -107,6 +107,7 @@ export default {
     title: 'Orders',
     description: 'View and manage customer orders',
     allOrders: 'All Orders',
+    submittedOrders: 'Submitted Orders',
     totalOrders: 'Total Orders',
     totalRevenue: 'Total Revenue',
     avgOrderValue: 'Avg Order Value',
@@ -126,6 +127,9 @@ export default {
       totalValue: 'Total Value',
       status: 'Status',
       expectedDelivery: 'Expected Delivery',
+      submittedAt: 'Submitted',
+      totalCost: 'Total Cost',
+      leadTime: 'Lead Time',
       actualDelivery: 'Actual Delivery'
     }
   },
