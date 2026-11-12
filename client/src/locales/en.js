@@ -7,6 +7,7 @@ export default {
     finance: 'Finance',
     demandForecast: 'Demand Forecast',
     restocking: 'Restocking',
+    reports: 'Reports',
     companyName: 'Catalyst Components',
     subtitle: 'Inventory Management System'
   },
@@ -160,6 +161,45 @@ export default {
       unitCost: 'Unit Cost',
       lineTotal: 'Line Total',
       leadTime: 'Lead Time'
+    }
+  },
+
+  // Reports
+  reports: {
+    title: 'Performance Reports',
+    description: 'View quarterly performance metrics and monthly trends',
+    loading: 'Loading reports...',
+    loadError: 'Failed to load reports',
+    noData: 'No orders match the selected filters',
+    // {q} = quarter number, {year} = 4-digit year
+    quarterLabel: 'Q{q} {year}',
+    // {month} = short month name from months.*, {year} = 4-digit year
+    monthLabel: '{month} {year}',
+    quarterly: {
+      title: 'Quarterly Performance',
+      quarter: 'Quarter',
+      totalOrders: 'Total Orders',
+      totalRevenue: 'Total Revenue',
+      avgOrderValue: 'Avg Order Value',
+      fulfillmentRate: 'Fulfillment Rate'
+    },
+    monthlyTrend: {
+      title: 'Monthly Revenue Trend'
+    },
+    monthOverMonth: {
+      title: 'Month-over-Month Analysis',
+      month: 'Month',
+      orders: 'Orders',
+      revenue: 'Revenue',
+      change: 'Change',
+      growthRate: 'Growth Rate',
+      notApplicable: 'N/A'
+    },
+    summary: {
+      totalRevenue: 'Total Revenue',
+      avgMonthlyRevenue: 'Avg Monthly Revenue',
+      totalOrders: 'Total Orders',
+      bestQuarter: 'Best Performing Quarter'
     }
   },
 
